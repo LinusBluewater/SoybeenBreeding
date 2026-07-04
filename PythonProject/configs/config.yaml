@@ -1,0 +1,40 @@
+project:
+  name: SoybeanBreeding
+  seed: 42
+
+paths:
+  geno: data/geno_clean.csv
+  pheno: data/pheno_clean.csv
+
+  gwas_out: outputs/gwas
+  model_out: outputs/models
+  plot_out: outputs/plots
+
+task:
+  target: yield
+  drop_cols: ["X", "year", "family"]
+
+data:
+  test_size: 0.2
+  val_size: 0.2
+  random_state: 42
+
+preprocess:
+  imputer: most_frequent
+  scaler: standard
+
+model:
+  cnn:
+    filters: [32, 64, 128]
+    kernels: [5, 5, 3]
+    dropout: 0.3
+    dense: 64
+
+train:
+  batch_size: 32
+  epochs: 100
+
+early_stop:
+  patience: 10
+  monitor: val_loss
+  restore_best_weights: true
