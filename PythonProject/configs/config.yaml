@@ -9,6 +9,7 @@ paths:
   gwas_out: outputs/gwas
   model_out: outputs/models
   plot_out: outputs/plots
+  figure_out: outputs/figures
 
 task:
   target: yield
