@@ -13,9 +13,26 @@ from sklearn.metrics import (
 )
 
 import tensorflow as tf
+import matplotlib
+matplotlib.use("Agg")  # 无显示环境（SSH/服务器）后端
 import matplotlib.pyplot as plt
 
 from src.cnn import build_cnn_with_env
+
+
+# ======================
+# GPU 内存按需增长（避免占满显存）
+# ======================
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for g in gpus:
+            tf.config.experimental.set_memory_growth(g, True)
+        print(f"已检测到 {len(gpus)} 个 GPU，启用显存按需增长")
+    except RuntimeError as e:
+        print(f"GPU 内存设置警告: {e}")
+else:
+    print("未检测到 GPU，使用 CPU 训练")
 
 
 # ======================
@@ -135,34 +152,51 @@ print(f"  目标 y:     {y.shape}")
 
 
 # ======================
-# 5. 按品种分组拆分（防止数据泄露）
+# 6. 按品种分组拆分（防止数据泄露）
 # ======================
 print("\n" + "=" * 50)
-print("按品种分组拆分训练/测试集...")
+print("按品种分组拆分训练/验证/测试集...")
 
 unique_strains = pheno_encoded["strain"].unique()
 print(f"  独立品种数: {len(unique_strains)}")
 
-train_strains, test_strains = train_test_split(
+# 第一层拆分：训练 vs (验证+测试)
+train_strains, temp_strains = train_test_split(
     unique_strains,
-    test_size=cfg["data"]["test_size"],
+    test_size=cfg["data"]["test_size"] + cfg["data"]["val_size"],
     random_state=cfg["data"]["random_state"]
 )
 
-# 按品种划分行索引
+# 第二层拆分：验证 vs 测试
+val_strains, test_strains = train_test_split(
+    temp_strains,
+    test_size=cfg["data"]["test_size"] / (cfg["data"]["test_size"] + cfg["data"]["val_size"]),
+    random_state=cfg["data"]["random_state"]
+)
+
+# 按品种划分行索引 —— 三者品种完全不重叠
 train_mask = pheno_encoded["strain"].isin(train_strains).values
+val_mask = pheno_encoded["strain"].isin(val_strains).values
 test_mask = pheno_encoded["strain"].isin(test_strains).values
 
-X_geno_train, X_geno_test = geno_expanded[train_mask], geno_expanded[test_mask]
-X_env_train, X_env_test = env_features[train_mask], env_features[test_mask]
-y_train, y_test = y[train_mask], y[test_mask]
+X_geno_train, X_geno_val, X_geno_test = (
+    geno_expanded[train_mask], geno_expanded[val_mask], geno_expanded[test_mask]
+)
+X_env_train, X_env_val, X_env_test = (
+    env_features[train_mask], env_features[val_mask], env_features[test_mask]
+)
+y_train, y_val, y_test = y[train_mask], y[val_mask], y[test_mask]
 
 print(f"  训练集: {len(y_train)} 条 (品种 {len(train_strains)})")
+print(f"  验证集: {len(y_val)} 条 (品种 {len(val_strains)})")
 print(f"  测试集: {len(y_test)} 条 (品种 {len(test_strains)})")
+print(f"  品种不重叠检查: {len(set(train_strains) & set(val_strains))}, "
+      f"{len(set(train_strains) & set(test_strains))}, "
+      f"{len(set(val_strains) & set(test_strains))} (全为0则无泄露)")
 
 
 # ======================
-# 6. 基因型特征预处理（填充 + 标准化）
+# 7. 基因型特征预处理（填充 + 标准化）
 # ======================
 print("\n" + "=" * 50)
 print("基因型特征预处理...")
@@ -170,22 +204,25 @@ print("基因型特征预处理...")
 # 填充缺失 SNP
 imputer = SimpleImputer(strategy=cfg["preprocess"]["imputer"])
 X_geno_train = imputer.fit_transform(X_geno_train)
+X_geno_val = imputer.transform(X_geno_val)
 X_geno_test = imputer.transform(X_geno_test)
 
 # 标准化
 scaler = StandardScaler()
 X_geno_train = scaler.fit_transform(X_geno_train)
+X_geno_val = scaler.transform(X_geno_val)
 X_geno_test = scaler.transform(X_geno_test)
 
 # Reshape 为 Conv1D 输入: (samples, n_snps, 1)
 X_geno_train = X_geno_train[..., None]
+X_geno_val = X_geno_val[..., None]
 X_geno_test = X_geno_test[..., None]
 
 print(f"  基因型输入形状: {X_geno_train.shape}")
 
 
 # ======================
-# 7. 构建双输入模型
+# 8. 构建双输入模型
 # ======================
 print("\n" + "=" * 50)
 print("构建模型...")
@@ -206,7 +243,7 @@ model.summary()
 
 
 # ======================
-# 8. 训练
+# 9. 训练
 # ======================
 print("\n" + "=" * 50)
 print("开始训练...")
@@ -217,19 +254,32 @@ early_stop = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=cfg["early_stop"]["restore_best_weights"]
 )
 
+# 保存最佳模型权重，防止 SSH 断开导致训练成果丢失
+checkpoint_path = os.path.join(
+    cfg["paths"]["model_out"],
+    f"cnn_env_{target}_ckpt.h5"
+)
+checkpoint = tf.keras.callbacks.ModelCheckpoint(
+    filepath=checkpoint_path,
+    monitor=cfg["early_stop"]["monitor"],
+    save_best_only=True,
+    save_weights_only=True,
+    verbose=1
+)
+
 history = model.fit(
     [X_geno_train, X_env_train],
     y_train,
-    validation_split=cfg["data"]["val_size"],
+    validation_data=([X_geno_val, X_env_val], y_val),
     epochs=cfg["train"]["epochs"],
     batch_size=cfg["train"]["batch_size"],
-    callbacks=[early_stop],
+    callbacks=[early_stop, checkpoint],
     verbose=1
 )
 
 
 # ======================
-# 9. 预测与评估
+# 10. 预测与评估
 # ======================
 print("\n" + "=" * 50)
 print("评估模型...")
@@ -251,7 +301,7 @@ print("=" * 50)
 
 
 # ======================
-# 10. 保存模型
+# 11. 保存模型
 # ======================
 model_path = os.path.join(
     cfg["paths"]["model_out"],
@@ -262,7 +312,7 @@ print(f"\n模型已保存: {model_path}")
 
 
 # ======================
-# 11. 绘制训练曲线
+# 12. 绘制训练曲线
 # ======================
 plt.figure(figsize=(8, 5))
 plt.plot(history.history["loss"], label="Train Loss")
