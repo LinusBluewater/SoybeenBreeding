@@ -5,6 +5,8 @@ project:
 paths:
   geno: data/geno_clean.csv
   pheno: data/pheno_clean.csv
+  geno_raw: data/geno.csv
+  pheno_raw: data/pheno.csv
 
   gwas_out: outputs/gwas
   model_out: outputs/models
@@ -14,6 +16,15 @@ paths:
 task:
   target: yield
   drop_cols: ["X", "year", "family"]
+  # 方案A：环境作为协变量时，从原始pheno中保留的性状列
+  trait_cols: ["height", "R8", "planting", "flower", "maturity", "lodging", "yield", "protein", "oil", "size"]
+  # 需要 one-hot 编码的环境列
+  env_col: "environ"
+
+# 方案A 专用配置
+env_model:
+  # 是否按品种分组拆分（防止数据泄露）
+  group_split: true
 
 data:
   test_size: 0.2
