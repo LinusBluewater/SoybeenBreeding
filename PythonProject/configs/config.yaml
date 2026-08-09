@@ -12,6 +12,8 @@ paths:
   model_out: outputs/models
   plot_out: outputs/plots
   figure_out: outputs/figures
+  blup_out: outputs/blup
+  preprocessor_out: outputs/preprocessors
 
 task:
   target: yield
@@ -25,6 +27,16 @@ task:
 env_model:
   # 是否按品种分组拆分（防止数据泄露）
   group_split: true
+
+# 方案2：BLUP 育种值提取配置
+blup:
+  enabled: true
+  env_col: "environ"        # 固定效应列（环境）
+  group_col: "strain"      # 随机效应列（品种）
+  method: "bfgs"            # 优化器：bfgs / lbfgs / powell
+  maxiter: 1000             # 最大迭代次数
+  min_envs_per_strain: 2    # 品种最少环境数（少于则剔除，否则 BLUP 不稳定）
+  out_dir: outputs/blup
 
 data:
   test_size: 0.2
