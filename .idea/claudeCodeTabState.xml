@@ -10,7 +10,7 @@
               <option name="sessionId" value="8e0a5f83-fa93-4aac-8a20-4cfccb65eb6a" />
               <option name="cwd" value="D:\Desktop\Projects\SoybeenBreeding" />
               <option name="model" value="claude-sonnet-4-7[1m]" />
-              <option name="permissionMode" value="default" />
+              <option name="permissionMode" value="acceptEdits" />
             </TabSessionState>
           </value>
         </entry>
