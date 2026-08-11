@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 环境
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 生成的模型（体积大，按需保存）
+PythonProject/outputs/models/*.keras
+PythonProject/outputs/models/*.h5
+PythonProject/outputs/models/*.pkl
+PythonProject/outputs/preprocessors/*.pkl
+
+# 生成的图表与中间结果
+PythonProject/outputs/figures/*.png
+PythonProject/outputs/blup/*.csv
+PythonProject/outputs/gwas/*
+PythonProject/outputs/plots/*
+
+# 日志
+*.log
+nohup.out
+
+# 临时/计划文档
+PLAN_*.md
+*_tmp.yaml
