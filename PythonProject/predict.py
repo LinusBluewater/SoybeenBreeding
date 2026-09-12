@@ -24,6 +24,7 @@ import pickle
 import argparse
 import numpy as np
 import pandas as pd
+import sklearn
 
 
 # ======================
@@ -35,9 +36,12 @@ TRAITS = ["height", "R8", "planting", "flower", "maturity",
 MODEL_DIR = "outputs/models"
 PREP_DIR = "outputs/preprocessors"
 
+# 已检查过版本不一致的性状（避免重复打印）
+_checked_traits = set()
+
 
 def load_model_and_preprocessor(trait):
-    """加载指定性状的模型和预处理器"""
+    """加载指定性状的模型和预处理器，并校验 sklearn 版本一致性"""
     model_path = os.path.join(MODEL_DIR, f"ridge_{trait}.pkl")
     prep_path = os.path.join(PREP_DIR, f"preprocessor_{trait}.pkl")
 
@@ -45,7 +49,24 @@ def load_model_and_preprocessor(trait):
         raise FileNotFoundError(f"模型未找到: {model_path}\n请先运行 train_ridge.py --target {trait}")
 
     with open(model_path, "rb") as f:
-        model = pickle.load(f)
+        obj = pickle.load(f)
+
+    # 兼容新格式 (dict 含 model + 版本) 和旧格式 (裸模型)
+    if isinstance(obj, dict) and "model" in obj:
+        train_ver = obj.get("sklearn_version", "未知")
+        model = obj["model"]
+    else:
+        train_ver = None
+        model = obj
+
+    # 版本校验：不一致时给出清晰提示（每个性状只提示一次）
+    cur_ver = sklearn.__version__
+    if train_ver and train_ver != cur_ver and trait not in _checked_traits:
+        _checked_traits.add(trait)
+        print(f"  [警告] '{trait}' 模型由 sklearn {train_ver} 训练，"
+              f"当前环境为 {cur_ver}，跨版本反序列化可能导致崩溃或结果错误。")
+        print(f"         解决: pip install scikit-learn=={train_ver}，"
+              f"或运行 train_ridge.py 用当前版本重训")
 
     with open(prep_path, "rb") as f:
         pp = pickle.load(f)

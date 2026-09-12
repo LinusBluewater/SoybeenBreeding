@@ -17,6 +17,7 @@ import argparse
 import yaml
 import numpy as np
 import pandas as pd
+import sklearn
 
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.impute import SimpleImputer
@@ -147,12 +148,16 @@ def train_one_trait(target, geno, pheno, cfg, verbose=True):
         print(f"预测相关 r:  {corr:.4f}  <- 育种界核心指标")
         print("=" * 50)
 
-    # ---------- 9. 保存模型 ----------
+    # ---------- 9. 保存模型 (附带 sklearn 版本，供部署时校验) ----------
     model_path = os.path.join(cfg["paths"]["model_out"], f"ridge_{target}.pkl")
+    save_obj = {
+        "model": model,
+        "sklearn_version": sklearn.__version__,
+    }
     with open(model_path, "wb") as f:
-        pickle.dump(model, f)
+        pickle.dump(save_obj, f)
     if verbose:
-        print(f"模型已保存: {model_path}")
+        print(f"模型已保存: {model_path} (sklearn {sklearn.__version__})")
 
     # ---------- 10. 散点图 ----------
     plt.figure(figsize=(7, 7))
