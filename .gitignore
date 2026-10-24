@@ -36,3 +36,14 @@ nohup.out
 # 临时/计划文档
 PLAN_*.md
 *_tmp.yaml
+
+# 原始数据 (PhysicData 888M, 本地保存)
+PythonProject/PhysicData/
+
+# 生成的基因型矩阵 (可从原始数据重新生成, 体积大)
+PythonProject/data/geno_physic.csv
+PythonProject/data/geno_600.csv
+PythonProject/data/geno_559_aligned.csv
+
+# 文献 PDF (体积大)
+Papers/*.pdf
