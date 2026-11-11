@@ -47,3 +47,8 @@ PythonProject/data/geno_559_aligned.csv
 
 # 文献 PDF (体积大)
 Papers/*.pdf
+
+# TASSEL GWAS 大文件 (中间产物)
+PythonProject/outputs/tassel_gwas/*.txt
+PythonProject/outputs/tassel_gwas/mlm_result*
+PythonProject/outputs/tassel_gwas/physic_kin*
